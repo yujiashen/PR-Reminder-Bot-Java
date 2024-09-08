@@ -5,7 +5,7 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from listeners import register_listeners
 from database import setup_dynamodb
-from database_settings import setup_dynamodb_settings
+from database_channel_settings import setup_dynamodb_settings
 
 load_dotenv()
 

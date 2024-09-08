@@ -4,7 +4,7 @@ import heapq
 from collections import defaultdict
 from slack_sdk import WebClient
 from database import get_prs_from_store, remove_pr_by_id, get_pr_by_id
-from database_settings import get_channel_sla_time, get_channel_enabled_hours
+from database_channel_settings import get_channel_sla_time, get_channel_enabled_hours
 from dotenv import load_dotenv
 from helpers import get_status, get_username
 import logging

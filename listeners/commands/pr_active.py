@@ -1,7 +1,7 @@
 import heapq
 from datetime import datetime
 from database import get_channel_prs, get_pr_by_id
-from database_settings import get_channel_sla_time
+from database_channel_settings import get_channel_sla_time
 from helpers import get_status, get_username
 from sla_check import format_time_overdue, format_time_until_overdue, get_username, calculate_working_hours
 

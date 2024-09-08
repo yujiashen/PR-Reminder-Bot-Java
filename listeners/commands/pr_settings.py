@@ -1,5 +1,5 @@
 from slack_sdk.errors import SlackApiError
-from database_settings import get_channel_sla_time, get_channel_enabled_hours, set_channel_sla_time, toggle_channel_hour
+from database_channel_settings import get_channel_sla_time, get_channel_enabled_hours, set_channel_sla_time, toggle_channel_hour
 from helpers import is_valid_int
 
 def pr_settings_callback(ack, body, client, logger):
