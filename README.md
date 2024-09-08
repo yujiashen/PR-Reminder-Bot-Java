@@ -31,8 +31,9 @@ A Slack bot designed to streamline the PR review process by tracking review stat
      ```
 
 3. **Run the Bot**:
-   Start the bot by running the following command:
+   Nevigate to the `src` directory and start the bot by running the following command:
    ```bash
+   cd src
    python app.py
    ```
 
@@ -44,7 +45,7 @@ The bot uses a cron job to check SLA times and notify channels periodically. To 
     ```
 - Add the following line to schedule the job (modify the path as necessary):
     ```
-    0 9-16 * * 1-5 /usr/bin/python /path/to/PR-Reminder-Bot/app.py
+    0 9-16 * * 1-5 /usr/bin/python /path/to/PR-Reminder-Bot/src/app.py
     ```
     This cron job will run every hour from 9 AM to 4 PM PST, Monday through Friday.
 - Save and close the cron file.
