@@ -5,13 +5,6 @@ from database import get_pr_by_id
 
 def handle_edit_pr(ack: Ack, body: dict, client: WebClient, logger: Logger):
     try:
-        # TO DO
-        if not is_valid_int(reviews_needed):
-            ack(response_action="errors", errors={
-                "reviews_needed_block": "Please enter a valid number."
-            })
-            return
-        
         ack()
 
         user_id = body["user"]["id"]  # ID of the user trying to edit the PR

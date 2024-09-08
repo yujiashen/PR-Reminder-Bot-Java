@@ -53,13 +53,11 @@ def handle_submit_pr(ack, body, client, logger):
         
         if not reviews_needed:
             reviews_needed = 2
-
         if not is_valid_int(reviews_needed):
             ack(response_action="errors", errors={
                 "reviews_needed_block": "Please enter a valid number."
             })
             return
-
         reviews_needed = int(reviews_needed) if reviews_needed else 2
 
         pr = get_pr_by_id(pr_id)

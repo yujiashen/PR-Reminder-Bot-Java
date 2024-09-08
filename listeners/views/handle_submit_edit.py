@@ -4,11 +4,10 @@ from slack_sdk import WebClient
 from logging import Logger
 from ..actions.block_helpers import assemble_pr_message_blocks
 from database import get_pr_by_id, add_pr_to_store
+from helpers import is_valid_int
 
 def handle_submit_edit(ack, body, client, logger):
     try:
-        ack()
-
         pr_name = body["view"]["state"]["values"]["pr_name_block"]["pr_name"]["value"]
         pr_link = body['view']['private_metadata']
         pr_description = body["view"]["state"]["values"]["pr_description_block"]["pr_description"]["value"] or ""
@@ -17,15 +16,17 @@ def handle_submit_edit(ack, body, client, logger):
 
         if not reviews_needed:
             reviews_needed = 2
-        else:
-            reviews_needed = int(reviews_needed)
-
+        if not is_valid_int(reviews_needed):
+            ack(response_action="errors", errors={
+                "reviews_needed_block": "Please enter a valid number."
+            })
+            return
         reviews_needed = int(reviews_needed) if reviews_needed else 2
 
         pr = get_pr_by_id(pr_id)
         
         if pr: # Existing PR
-            print(pr)
+            ack()
             user_id = body["user"]["id"]
             # Finalize removals
             if pr and "pending_removals_review" in pr:
@@ -118,7 +119,11 @@ def handle_submit_edit(ack, body, client, logger):
             add_pr_to_store(pr)
             logger.info(f"PR {pr_id} updated successfully.")
         else:
+            ack(response_action="errors", errors={
+                "pr_description_block": "PR not found."
+            })
             logger.error(f"PR with ID {pr_id} not found for editing.")
+
 
     except Exception as e:
         logger.error(e)
