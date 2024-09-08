@@ -2,12 +2,11 @@ from slack_bolt import Ack, Respond
 from slack_sdk import WebClient
 from logging import Logger
 
-# Define the callback function at the top level
-
-# Define the callback function at the top level
 def submit_pr_callback(command, ack: Ack, respond: Respond, client: WebClient, logger: Logger):
     try:
         ack()
+        logger.info(f"Opening PR submission modal for channel {command['channel_id']} by user {command['user_id']}")
+        
         client.views_open(
             trigger_id=command["trigger_id"],
             view={
@@ -93,6 +92,7 @@ def submit_pr_callback(command, ack: Ack, respond: Respond, client: WebClient, l
                 }
             }
         )
+        logger.info(f"PR submission modal opened successfully for user {command['user_id']}.")
     except Exception as e:
-        logger.error(e)
+        logger.error(f"Error opening PR submission modal for user {command['user_id']}: {e}")
         respond("There was an error opening the modal.")

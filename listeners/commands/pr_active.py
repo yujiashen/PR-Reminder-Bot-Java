@@ -1,13 +1,12 @@
-
 import heapq
 from datetime import datetime
-from slack_sdk import WebClient
 from database import get_channel_prs, get_pr_by_id
 from database_settings import get_channel_sla_time
 from helpers import get_status, get_username
 from sla_check import format_time_overdue, format_time_until_overdue, get_username, calculate_working_hours
 
-def populate_message_text(channel_sla_time,overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs, client):
+def populate_message_text(channel_sla_time, overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs, client, logger):
+    logger.info(f"Generating message text for channel with SLA time: {channel_sla_time}")
     message_text = "*:bell: PR Review Reminder*\n"
     message_text += "Here's a summary of active PRs in this channel:\n\n"
 
@@ -67,12 +66,13 @@ def populate_message_text(channel_sla_time,overdue_pr_heap, near_sla_prs, active
             submitter_name = get_username(client, pr['submitter_id'])
             message_text += f"• *<{pr['permalink']}|{pr['name']}>* by {submitter_name}\n"
 
+    logger.info("Message text generated successfully")
     return message_text
 
 
-def populate_sla(prs, channel_sla_time):
+def populate_sla(prs, channel_sla_time, logger):
     now = datetime(2024, 9, 6, 16, 40)
-    print("Now is",now)
+    logger.info(f"Populating SLA data at {now}")
     overdue_pr_heap = []  # Use a list for heap
     near_sla_prs = []
     active_prs = []
@@ -90,36 +90,39 @@ def populate_sla(prs, channel_sla_time):
             heapq.heappush(overdue_pr_heap, (-time_overdue_seconds, pr_id))
         # Check if the PR is within 1 hour of SLA
         elif (SLA_hours - 1) * 3600 <= time_elapsed <= SLA_hours * 3600 and reviews_needed:
-            near_sla_prs.append((pr,time_elapsed))
+            near_sla_prs.append((pr, time_elapsed))
         elif not reviews_needed:
             reviewed_prs.append(pr)
         else:
             active_prs.append(pr)
 
+    logger.info(f"SLA data populated: {len(overdue_pr_heap)} overdue, {len(near_sla_prs)} near SLA, {len(active_prs)} active, {len(reviewed_prs)} reviewed")
     return overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs
 
 
 def pr_active_callback(ack, body, client, logger):
     ack()
-    print("IN PR ACTIVE CALLBACK")
     channel_id = body['channel_id']
+    logger.info(f"PR active callback invoked for channel {channel_id}")
 
     # Fetch PRs for the channel from DynamoDB
     prs = get_channel_prs(channel_id)
-
     if not prs:
         client.chat_postMessage(
             channel=channel_id,
             text="No active PRs found for this channel."
         )
+        logger.info(f"No active PRs found for channel {channel_id}")
         return
 
     channel_sla_time = get_channel_sla_time(channel_id)
+    logger.info(f"Channel SLA time for channel {channel_id}: {channel_sla_time} hours")
+
     # Populate the SLA data for this channel
-    overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs = populate_sla(prs, channel_sla_time)
+    overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs = populate_sla(prs, channel_sla_time, logger)
 
     # Generate the message text
-    message_text = populate_message_text(channel_sla_time,overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs, client)
+    message_text = populate_message_text(channel_sla_time, overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs, client, logger)
 
     # Send the message to the channel
     if message_text:
@@ -129,5 +132,6 @@ def pr_active_callback(ack, body, client, logger):
                 text=message_text,
                 unfurl_links=False
             )
+            logger.info(f"PR summary message posted successfully to channel {channel_id}")
         except Exception as e:
             logger.error(f"Error sending message to channel {channel_id}: {e}")

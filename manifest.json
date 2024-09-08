@@ -16,14 +16,6 @@
         "display_name": "Pull Requests",
         "always_online": false
       },
-      "shortcuts": [
-        {
-          "name": "Run sample shortcut",
-          "type": "global",
-          "callback_id": "sample_shortcut_id",
-          "description": "Runs a sample shortcut"
-        }
-      ],
       "slash_commands": [
         {
           "command": "/submit-pr",

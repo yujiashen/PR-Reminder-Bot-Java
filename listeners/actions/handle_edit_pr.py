@@ -10,10 +10,14 @@ def handle_edit_pr(ack: Ack, body: dict, client: WebClient, logger: Logger):
         user_id = body["user"]["id"]  # ID of the user trying to edit the PR
         action_id = body["actions"][0]["action_id"]
         pr_id = action_id.replace("edit_pr_", "")
+        logger.info(f"User {user_id} is attempting to edit PR {pr_id}")
 
         pr = get_pr_by_id(pr_id)
 
         if pr:
+            logger.info(f"PR {pr_id} found. Proceeding with edit.")
+
+            # Check if the user is the submitter of the PR
             if user_id != pr["submitter_id"]:
                 # If the user is not the submitter, deny access
                 client.chat_postEphemeral(
@@ -21,8 +25,9 @@ def handle_edit_pr(ack: Ack, body: dict, client: WebClient, logger: Logger):
                     user=user_id,
                     text="Only the PR submitter can edit this PR."
                 )
+                logger.warning(f"User {user_id} is not the submitter of PR {pr_id}. Edit access denied.")
                 return  # Don't proceed with opening the modal
-            
+
             pr_description = pr["description"] if pr["description"] else ""
 
             # Create the list of reviewers with remove buttons
@@ -44,7 +49,6 @@ def handle_edit_pr(ack: Ack, body: dict, client: WebClient, logger: Logger):
                     }
                 })
 
-
             # Add the "Review updated, ping previous reviewers" button only if there are reviewers
             if pr["reviewers"]:
                 reviewer_blocks.append({
@@ -63,9 +67,8 @@ def handle_edit_pr(ack: Ack, body: dict, client: WebClient, logger: Logger):
                     ]
                 })
 
-
             attention_blocks = []
-            for user_id in pr["attention_requests"]:
+            for attention_id in pr["attention_requests"]:
                 pinged_button_element = {
                     "type": "button",
                     "text": {
@@ -73,16 +76,16 @@ def handle_edit_pr(ack: Ack, body: dict, client: WebClient, logger: Logger):
                         "text": "Ping & Remove",
                         "emoji": True
                     },
-                    "action_id": f"pingAttention_{user_id}_{pr_id}",
+                    "action_id": f"pingAttention_{attention_id}_{pr_id}",
                     "style": "primary",
-                    "value": user_id
+                    "value": attention_id
                 }
 
                 attention_blocks.append({
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"<@{user_id}>"
+                        "text": f"<@{attention_id}>"
                     }
                 })
                 attention_blocks.append({
@@ -93,7 +96,7 @@ def handle_edit_pr(ack: Ack, body: dict, client: WebClient, logger: Logger):
                             "type": "button",
                             "text": {"type": "plain_text", "text": "Remove"},
                             "style": "danger",
-                            "action_id": f"removeAttention_{user_id}_{pr_id}"
+                            "action_id": f"removeAttention_{attention_id}_{pr_id}"
                         }
                     ]
                 })
@@ -191,6 +194,7 @@ def handle_edit_pr(ack: Ack, body: dict, client: WebClient, logger: Logger):
                     }
                 }
             )
+            logger.info(f"Opened edit modal for PR {pr_id} for user {user_id}")
 
     except Exception as e:
-        logger.error(e)
+        logger.error(f"Error handling edit PR for PR {pr_id}: {e}")

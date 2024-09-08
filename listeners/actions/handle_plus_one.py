@@ -11,6 +11,7 @@ def handle_plus_one(ack: Ack, body: dict, client: WebClient, logger: Logger):
         user_id = body["user"]["id"]
         action_id = body["actions"][0]["action_id"]
         pr_id = action_id.replace("plus_one_", "")
+        logger.info(f"User {user_id} is attempting to +1 PR {pr_id}")
 
         pr = get_pr_by_id(pr_id)
 
@@ -20,13 +21,16 @@ def handle_plus_one(ack: Ack, body: dict, client: WebClient, logger: Logger):
                 # User has already +1'd, remove the +1
                 del pr["reviewers"][user_id]
                 pr["reviews_received"] -= 1
+                logger.info(f"User {user_id} removed their +1 from PR {pr_id}")
             else:
                 # User is +1'ing the PR, add it
                 pr["reviewers"][user_id] = True
                 pr["reviews_received"] += 1
+                logger.info(f"User {user_id} added their +1 to PR {pr_id}")
             
             add_pr_to_store(pr)
-            
+            logger.info(f"PR {pr_id} updated in the store.")
+
             # Fetch the updated list of reviewers
             reviewer_names = []
             for reviewer in pr["reviewers"]:
@@ -62,11 +66,12 @@ def handle_plus_one(ack: Ack, body: dict, client: WebClient, logger: Logger):
                     ],
                     unfurl_links = False
                 )
+                logger.info(f"PR {pr_id} has enough reviews and is ready to be merged.")
             else:
                 message_text += f"\nNeeds {reviews_needed} more reviews\n\n*Reviewers:* {reviewers_text}"
 
             # Reconstruct the blocks with updated information
-            blocks = assemble_pr_message_blocks(client, pr, user_id)
+            blocks = assemble_pr_message_blocks(client, pr, user_id, logger)
 
             # Update the original message with the new blocks
             client.chat_update(
@@ -75,6 +80,10 @@ def handle_plus_one(ack: Ack, body: dict, client: WebClient, logger: Logger):
                 blocks=blocks,
                 text=message_text
             )
+            logger.info(f"Updated message for PR {pr_id} in channel {pr['channel_id']}.")
 
+        else:
+            logger.warning(f"PR {pr_id} not found in the store.")
+    
     except Exception as e:
-        logger.error(f"Error in handle_plus_one: {e}")
+        logger.error(f"Error in handle_plus_one for PR {pr_id}: {e}")

@@ -1,5 +1,5 @@
 
-from .block_helpers import assemble_pr_message_blocks, create_plus_one_button, create_remove_button
+from .block_helpers import assemble_pr_message_blocks
 from .handle_plus_one import handle_plus_one
 from .handle_remove_reviewer import handle_remove_reviewer, handle_remove_attention, handle_ping_attention
 from .handle_remove_pr import handle_remove_pr

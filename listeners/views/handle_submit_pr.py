@@ -49,6 +49,7 @@ def handle_submit_pr(ack, body, client, logger):
             ack(response_action="errors", errors={
                 "pr_link_block": "The PR link you entered is not valid. Please enter a valid URL."
             })
+            logger.warning(f"Invalid PR link provided: {pr_link}")
             return
         
         if not reviews_needed:
@@ -57,6 +58,7 @@ def handle_submit_pr(ack, body, client, logger):
             ack(response_action="errors", errors={
                 "reviews_needed_block": "Please enter a valid number."
             })
+            logger.warning(f"Invalid reviews needed value: {reviews_needed}")
             return
         reviews_needed = int(reviews_needed) if reviews_needed else 2
 
@@ -66,6 +68,7 @@ def handle_submit_pr(ack, body, client, logger):
             ack(response_action="errors", errors={
                 "pr_link_block": "A PR with this link already exists. Please use a different link."
             })
+            logger.warning(f"PR with ID {pr_id} already exists.")
             return
         else: # New PR
             ack()
@@ -88,7 +91,7 @@ def handle_submit_pr(ack, body, client, logger):
             response = client.chat_postMessage(
                 channel=channel_id,
                 text=f"PR submitted: *<{pr_link}|{pr_name}>*",
-                blocks=assemble_pr_message_blocks(client, pr_info, user_id=submitter_id),
+                blocks=assemble_pr_message_blocks(client, pr_info, submitter_id, logger),
                 unfurl_links = False
             )
 
@@ -105,10 +108,10 @@ def handle_submit_pr(ack, body, client, logger):
                     pr_info['permalink'] = permalink
                 
                 add_pr_to_store(pr_info)
-                print(f"PR {pr_id} stored successfully.", get_pr_by_id(pr_id))
+                logger.info(f"PR {pr_id} submitted and stored successfully.")
             else:
-                print(f"Failed to post message for PR {pr_id}. Response: {response}")
+                logger.error(f"Failed to post message for PR {pr_id}. Response: {response}")
 
     except Exception as e:
-        logger.error(e)
+        logger.error(f"Error during PR submission: {e}")
 

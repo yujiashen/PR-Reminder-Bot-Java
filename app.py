@@ -10,7 +10,7 @@ from database_settings import setup_dynamodb_settings
 # from sla_check import schedule_sla_check, run_scheduler
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)  # You can change this to DEBUG, ERROR, etc.
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 app = App(token=os.environ.get("SLACK_BOT_TOKEN"))

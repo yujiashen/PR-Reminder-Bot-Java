@@ -1,12 +1,14 @@
 from slack_sdk import WebClient
 from logging import Logger
-from database import get_user_prs, remove_pr_by_id  # Database functions
+from database import get_user_prs  # Database functions
 from helpers import get_status
+from ..actions.handle_remove_pr import handle_remove_pr
 
 # Function to republish the app home after changes
-def update_app_home(client, user_id):
+def update_app_home(client, user_id, logger):
+    logger.info(f"Updating app home for user {user_id}")
+    
     active_prs = get_user_prs(user_id)
-
     blocks = [
         {
             "type": "section",
@@ -28,25 +30,56 @@ def update_app_home(client, user_id):
     ]
 
     if active_prs:
+        logger.info(f"User {user_id} has {len(active_prs)} active PRs.")
         for pr in active_prs:
             pr_status = get_status(pr)
+            reviewers_text = ""
+            if pr['reviewers']:
+                reviewers_text = " - reviewed by "
+                reviewers_text += ", ".join(
+                    [f"<@{r}>" for r in pr["reviewers"]]
+                )
             blocks.append({
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"• <{pr['permalink']}|{pr['name']}> - {pr_status}"
-                },
-                "accessory": {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Remove"
-                    },
-                    "style": "danger",
-                    "action_id": f"removePr_home_{pr['id']}"
+                    "text": f"• *<{pr['permalink']}|{pr['name']}>* - {pr_status}{reviewers_text}"
                 }
             })
+            blocks.append({
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Remove"
+                        },
+                        "style": "danger",
+                        "action_id": f"removePr_home_{pr['id']}",
+                        "confirm": {
+                            "title": {
+                                "type": "plain_text",
+                                "text": "Remove this PR?"
+                            },
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": "This action cannot be undone."
+                            },
+                            "confirm": {
+                                "type": "plain_text",
+                                "text": "Yes, remove it"
+                            },
+                            "deny": {
+                                "type": "plain_text",
+                                "text": "Cancel"
+                            }
+                        }
+                    }
+                ]
+            })
     else:
+        logger.info(f"No active PRs found for user {user_id}.")
         blocks.append({
             "type": "section",
             "text": {
@@ -62,6 +95,7 @@ def update_app_home(client, user_id):
             "blocks": blocks
         }
     )
+    logger.info(f"App home view updated successfully for user {user_id}.")
 
 # Handler for the remove button
 def handle_remove_pr_home(ack, body, client, logger):
@@ -70,12 +104,9 @@ def handle_remove_pr_home(ack, body, client, logger):
     user_id = body["user"]["id"]
     
     try:
-        # Remove PR from the store
-        remove_pr_by_id(pr_id)
-        logger.info(f"PR {pr_id} removed successfully.")
-
+        handle_remove_pr(ack, body, client, logger)
         # Update the app home after removing the PR
-        update_app_home(client, user_id)
+        update_app_home(client, user_id, logger)
 
     except Exception as e:
         logger.error(f"Error removing PR {pr_id}: {e}")
@@ -84,9 +115,10 @@ def handle_remove_pr_home(ack, body, client, logger):
 def app_home_opened_callback(client: WebClient, event: dict, logger: Logger):
     if event["tab"] != "home":
         return
-    
+
     try:
         user_id = event["user"]
+        logger.info(f"App home opened by user {user_id}.")
         
         # Fetch the user's active PRs
         active_prs = get_user_prs(user_id)
@@ -112,25 +144,56 @@ def app_home_opened_callback(client: WebClient, event: dict, logger: Logger):
         ]
 
         if active_prs:
+            logger.info(f"User {user_id} has {len(active_prs)} active PRs.")
             for pr in active_prs:
                 pr_status = get_status(pr)
+                reviewers_text = ""
+                if pr['reviewers']:
+                    reviewers_text = " - reviewed by "
+                    reviewers_text += ", ".join(
+                        [f"<@{r}>" for r in pr["reviewers"]]
+                    )
                 blocks.append({
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"• <{pr['permalink']}|{pr['name']}> - {pr_status}"
-                    },
-                    "accessory": {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "Remove"
-                        },
-                        "style": "danger",
-                        "action_id": f"removePr_home_{pr['id']}"
+                        "text": f"• *<{pr['permalink']}|{pr['name']}>* - {pr_status}{reviewers_text}"
                     }
                 })
+                blocks.append({
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "Remove"
+                            },
+                            "style": "danger",
+                            "action_id": f"removePr_home_{pr['id']}",
+                            "confirm": {
+                                "title": {
+                                    "type": "plain_text",
+                                    "text": "Remove this PR?"
+                                },
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": "This action cannot be undone."
+                                },
+                                "confirm": {
+                                    "type": "plain_text",
+                                    "text": "Yes, remove it"
+                                },
+                                "deny": {
+                                    "type": "plain_text",
+                                    "text": "Cancel"
+                                }
+                            }
+                        }
+                    ]
+                })
         else:
+            logger.info(f"No active PRs found for user {user_id}.")
             blocks.append({
                 "type": "section",
                 "text": {
@@ -147,6 +210,7 @@ def app_home_opened_callback(client: WebClient, event: dict, logger: Logger):
                 "blocks": blocks
             }
         )
+        logger.info(f"App home view published successfully for user {user_id}.")
 
     except Exception as e:
-        logger.error(f"Error publishing home tab: {e}")
+        logger.error(f"Error publishing home tab for user {user_id}: {e}")
