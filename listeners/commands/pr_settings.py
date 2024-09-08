@@ -2,10 +2,10 @@ import re
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from database_settings import get_channel_sla_time, get_channel_enabled_hours, set_channel_sla_time, toggle_channel_hour
+from helpers import is_valid_int
 
 def pr_settings_callback(ack, body, client, logger):
     ack()
-
     channel_id = body['channel_id']
     
     # Retrieve the current settings for this channel (SLA time and enabled hours)
@@ -108,6 +108,13 @@ def handle_sla_time_input(ack, body, client, logger):
     
     # Extract SLA time input from the modal submission
     sla_time = body['view']['state']['values']['sla_time_input']['sla_time_input_action']['value']
+
+    # Check if the SLA time is a valid integer
+    if not is_valid_int(sla_time):
+        ack(response_action="errors", errors={
+            "sla_time_input": "Please enter an integer"
+        })
+        return
     
     try:
         # Store the new SLA time for this channel

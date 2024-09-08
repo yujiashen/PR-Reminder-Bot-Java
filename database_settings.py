@@ -34,7 +34,7 @@ def get_channel_sla_time(channel_id):
         response = table.get_item(Key={'channel_id': channel_id})
         if 'Item' in response:
             # Return the SLA time if it exists, otherwise default to 8 hours
-            return response['Item'].get('sla_time', 8)
+            return int(response['Item'].get('sla_time', 8))
         else:
             # Default SLA time is 8 hours if no settings exist for the channel
             return 8

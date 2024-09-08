@@ -7,9 +7,10 @@ from database import get_pr_by_id, add_pr_to_store
 def ensure_http_scheme(url: str) -> str:
     """Ensure the URL has an http or https scheme, defaulting to https if missing."""
     parsed_url = urlparse(url)
+    lower_url = url.lower()
     if not parsed_url.scheme:
-        return f"https://{url}"
-    return url
+        return f"https://{lower_url}"
+    return lower_url
 
 def is_valid_url(url: str) -> bool:
     """Check if the given URL is valid, ensuring it has a scheme and a proper domain."""
@@ -41,22 +42,21 @@ def handle_submit_pr(ack, body, client, logger):
         reviews_needed = body["view"]["state"]["values"]["reviews_needed_block"]["reviews_needed"]["value"]
         channel_id = body['view']['private_metadata']
 
-        if not reviews_needed:
-            reviews_needed = 2
-        else:
-            reviews_needed = int(reviews_needed)
-
-        pr_id = ensure_http_scheme(pr_link)
+        pr_link = ensure_http_scheme(pr_link)
+        pr_id = pr_link
 
         if not is_valid_url(pr_link):
             ack(response_action="errors", errors={
                 "pr_link_block": "The PR link you entered is not valid. Please enter a valid URL."
             })
             return
+        
+        if not reviews_needed:
+            reviews_needed = 2
 
         if not is_valid_int(reviews_needed):
             ack(response_action="errors", errors={
-                "reviews_needed_block": "Please enter a valid number for reviews needed."
+                "reviews_needed_block": "Please enter a valid number."
             })
             return
 
@@ -90,7 +90,8 @@ def handle_submit_pr(ack, body, client, logger):
             response = client.chat_postMessage(
                 channel=channel_id,
                 text=f"PR submitted: *<{pr_link}|{pr_name}>*",
-                blocks=assemble_pr_message_blocks(client, pr_info, user_id=submitter_id)
+                blocks=assemble_pr_message_blocks(client, pr_info, user_id=submitter_id),
+                unfurl_links = False
             )
 
             # Check if the response is successful

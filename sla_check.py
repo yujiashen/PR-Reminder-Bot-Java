@@ -6,6 +6,7 @@ from slack_sdk import WebClient
 from database import get_prs_from_store, remove_pr_by_id, get_pr_by_id
 from database_settings import get_channel_sla_time, get_channel_enabled_hours
 from dotenv import load_dotenv
+from helpers import get_status, get_username
 
 load_dotenv()
 
@@ -33,10 +34,30 @@ def calculate_working_hours(start_time, end_time):
     return total_seconds
 
 def format_time_overdue(time_overdue_seconds):
-    """Convert time overdue from seconds to hours and minutes."""
+    """
+    Convert time overdue from seconds to hours and minutes,
+    subtracting the SLA time, which is in hours.
+    """
     minutes, seconds = divmod(time_overdue_seconds, 60)
     hours, minutes = divmod(minutes, 60)
+    
     return f"{int(hours)} hours, {int(minutes)} minutes"
+
+def format_time_until_overdue(time_elapsed_seconds, channel_sla_time):
+    """
+    Convert time until overdue from seconds to minutes,
+    subtracting the elapsed time from the SLA time.
+    """
+    # Convert channel SLA time from hours to seconds
+    channel_sla_seconds = int(channel_sla_time) * 3600
+    
+    # Calculate remaining time until SLA is exceeded
+    remaining_seconds = channel_sla_seconds - time_elapsed_seconds
+    
+    # Convert the remaining seconds into minutes
+    remaining_minutes = remaining_seconds // 60
+    
+    return f"{int(remaining_minutes)} minutes until overdue"
 
 def is_pr_due_for_removal(pr, now):
     """Check if PR is older than 5 working days (excluding weekends)."""
@@ -51,17 +72,9 @@ def is_pr_due_for_removal(pr, now):
 
     return working_days >= 5
 
-def get_user_name(client, user_id):
-    """Retrieve the user's name from their user ID."""
-    try:
-        user_info = client.users_info(user=user_id)
-        return user_info['user']['real_name']
-    except Exception as e:
-        print(f"Error fetching user name for ID {user_id}: {e}")
-        return "Unknown User"
-
 def populate_sla(pr_store):
-    now = datetime.now()
+    # now = datetime.now()
+    now = datetime(2024, 9, 6, 16, 40)
     prs_to_remove = []
     overdue_pr_heap = defaultdict(list)
     near_sla_prs = defaultdict(list)
@@ -71,7 +84,6 @@ def populate_sla(pr_store):
         channel_id=pr["channel_id"]
         # Fetch the channel-specific SLA time and enabled hours
         channel_sla_time = get_channel_sla_time(channel_id)  # Default to 8 hours if not set
-        
         # Remove PRs older than 5 working days
         if is_pr_due_for_removal(pr, now):
             print(f"PR {pr_id} is older than 5 working days. Removing it from the store.")
@@ -86,18 +98,18 @@ def populate_sla(pr_store):
         
 
         pr_timestamp = datetime.fromisoformat(pr["timestamp"])
-        time_elapsed = calculate_working_hours(pr_timestamp-timedelta(hours=3), now)
+        time_elapsed = calculate_working_hours(pr_timestamp, now)
         reviews_needed = pr["reviews_received"] < pr["reviews_needed"]
 
         # Check if the PR is overdue (SLA exceeded)
         # if reviews_needed and datetime.now() - pr_timestamp > timedelta(minutes=2):
         if time_elapsed > channel_sla_time * convert_seconds and reviews_needed:
-            time_overdue_seconds = time_elapsed - int(channel_sla_time) * convert_seconds
+            time_overdue_seconds = time_elapsed - channel_sla_time * convert_seconds
             heapq.heappush(overdue_pr_heap[pr["channel_id"]], (-time_overdue_seconds, pr_id))
         # Check if the PR is within 1 hour of SLA
         elif (channel_sla_time-1) * convert_seconds <= time_elapsed <= channel_sla_time * convert_seconds and reviews_needed:
         # elif reviews_needed and timedelta(minutes=0) <= datetime.now() - pr_timestamp <= timedelta(minutes=2):
-            near_sla_prs[pr["channel_id"]].append(pr)
+            near_sla_prs[pr["channel_id"]].append((pr, time_elapsed))
     
     return prs_to_remove, overdue_pr_heap, near_sla_prs
 
@@ -110,30 +122,42 @@ def populate_message_text(channel_id, overdue_pr_heap, near_sla_prs):
     
     # Add overdue PRs to the message
     if channel_id in overdue_pr_heap:
-        message_text += ":warning: *The following PRs are overdue for review:*\n"
+        message_text += ":warning: *The following PRs are overdue for review*\n\n"
         while overdue_pr_heap[channel_id]:
             time_overdue, pr_id = heapq.heappop(overdue_pr_heap[channel_id])
             pr = get_pr_by_id(pr_id)
             formatted_time_overdue = format_time_overdue(-time_overdue)  # Format the overdue time in hours and minutes
-            submitter_name = get_user_name(client, pr['submitter_id'])
-            message_text += f"• <{pr['permalink']}|{pr['name']}> by {submitter_name} - Overdue by {formatted_time_overdue}\n"  # Prevent unfurling
-
+            submitter_name = get_username(client, pr['submitter_id'])
+            pr_status = get_status(pr)  # Get the status using get_status
+            message_text += (
+                f"• *<{pr['permalink']}|{pr['name']}>* by {submitter_name}\n"
+                f"   - Overdue by {formatted_time_overdue}\n"
+                f"   - _Status_: {pr_status}\n"
+            )
     # Add near-SLA PRs to the message
     if channel_id in near_sla_prs:
-        if message_text:
-            message_text += "\n"  # Separate the overdue and near-SLA sections
-        
-        message_text += ":hourglass_flowing_sand: *The following PRs are within 1 hour of SLA:*\n"
-        for pr in near_sla_prs[channel_id]:
-            submitter_name = get_user_name(client, pr['submitter_id'])
-            message_text += f"• <{pr['permalink']}|{pr['name']}> by {submitter_name}\n"
-    
+        if overdue_pr_heap:
+            message_text += "\n"
+        message_text += ":hourglass_flowing_sand: *The following PRs are within 1 hour of SLA*\n\n"
+        for pr, time_elapsed in near_sla_prs[channel_id]:
+            submitter_name = get_username(client, pr['submitter_id'])
+            pr_status = get_status(pr)
+            formatted_time_until_overdue = format_time_until_overdue(time_elapsed, channel_sla_time)
+            message_text += (
+                f"• *<{pr['permalink']}|{pr['name']}>* by {submitter_name}\n"
+                f"   - {formatted_time_until_overdue}\n"
+                f"   - _Status_: {pr_status}\n"
+            )    
     return message_text
 
 
 def check_sla(client):
     """Check all PRs in the store for SLA violations and those within 1 hour of the SLA."""
-    print(f"Running SLA check at {datetime.now()}")
+    now = datetime(2024, 9, 6, 16, 40)
+    print(f"Running SLA check at {now}")
+    current_hour = now.hour
+    # print(f"Running SLA check at {datetime.now()}")
+    # current_hour = datetime.now().hour
     pr_store = get_prs_from_store()
     prs_to_remove, overdue_pr_heap, near_sla_prs = populate_sla(pr_store)
 
@@ -147,7 +171,6 @@ def check_sla(client):
     for channel_id in channels_to_notify:
         # Check if the current time is within the enabled hours for the channel
         enabled_hours = get_channel_enabled_hours(channel_id)
-        current_hour = datetime.now().hour
         if current_hour not in enabled_hours:
             continue  # Skip sending the message if outside enabled hours
 

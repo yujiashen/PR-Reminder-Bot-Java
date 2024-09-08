@@ -3,78 +3,105 @@ import heapq
 from datetime import datetime
 from slack_sdk import WebClient
 from database import get_channel_prs, get_pr_by_id
-from helpers import get_status
-from sla_check import format_time_overdue, get_user_name, calculate_working_hours
+from database_settings import get_channel_sla_time
+from helpers import get_status, get_username
+from sla_check import format_time_overdue, format_time_until_overdue, get_username, calculate_working_hours
 
-SLA_hours = 8
-convert_seconds = 120
-
-def populate_message_text(channel_id, overdue_pr_heap, near_sla_prs, active_prs, client):
+def populate_message_text(channel_sla_time,overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs, client):
     message_text = "*:bell: PR Review Reminder*\n"
     message_text += "Here's a summary of active PRs in this channel:\n\n"
 
     # Add overdue PRs to the message
     if overdue_pr_heap:
-        message_text += ":warning: *The following PRs are overdue for review:*\n"
+        message_text += ":warning: *The following PRs are overdue for review*\n\n"
         while overdue_pr_heap:
             time_overdue, pr_id = heapq.heappop(overdue_pr_heap)
             pr = get_pr_by_id(pr_id)
             formatted_time_overdue = format_time_overdue(-time_overdue)
-            submitter_name = get_user_name(client, pr['submitter_id'])
+            submitter_name = get_username(client, pr['submitter_id'])
             pr_status = get_status(pr)  # Get the status using get_status
-            message_text += f"• <{pr['permalink']}|{pr['name']}> by {submitter_name} - Overdue by {formatted_time_overdue} - Status: {pr_status}\n"
-
+            message_text += (
+                f"• *<{pr['permalink']}|{pr['name']}>* by {submitter_name}\n"
+                f"   - Overdue by {formatted_time_overdue}\n"
+                f"   - _Status_: {pr_status}\n"
+            )
+        if near_sla_prs or active_prs or reviewed_prs:
+            message_text += "\n"
     # Add near-SLA PRs to the message
     if near_sla_prs:
-        if message_text:
-            message_text += "\n"
-        message_text += ":hourglass_flowing_sand: *The following PRs are within 1 hour of SLA:*\n"
-        for pr in near_sla_prs:
-            submitter_name = get_user_name(client, pr['submitter_id'])
+        message_text += ":hourglass_flowing_sand: *The following PRs are within 1 hour of SLA*\n\n"
+        for pr, time_elapsed in near_sla_prs:
+            submitter_name = get_username(client, pr['submitter_id'])
             pr_status = get_status(pr)
-            message_text += f"• <{pr['permalink']}|{pr['name']}> by {submitter_name} - Status: {pr_status}\n"
-
+            formatted_time_until_overdue = format_time_until_overdue(time_elapsed, channel_sla_time)
+            message_text += (
+                f"• *<{pr['permalink']}|{pr['name']}>* by {submitter_name}\n"
+                f"   - {formatted_time_until_overdue}\n"
+                f"   - _Status_: {pr_status}\n"
+            )
+        if active_prs or reviewed_prs:
+            message_text += "\n"
     # Add active PRs that aren't overdue or near-SLA
     if active_prs:
-        if message_text:
-            message_text += "\n"
-        message_text += ":scroll: *Other Active PRs:*\n"
+        if overdue_pr_heap or near_sla_prs:
+            message_text += ":scroll: *Other Active PRs*\n\n"
+        else:
+            message_text += ":scroll: *Active PRs*\n\n"
+
         for pr in active_prs:
-            submitter_name = get_user_name(client, pr['submitter_id'])
+            submission_time = datetime.fromisoformat(pr['timestamp']).strftime('%b %-d, %-I:%M %p')
+            submitter_name = get_username(client, pr['submitter_id'])
             pr_status = get_status(pr)
-            message_text += f"• <{pr['permalink']}|{pr['name']}> by {submitter_name} - Status: {pr_status}\n"
+            message_text += (
+                f"• *<{pr['permalink']}|{pr['name']}>* by {submitter_name}\n"
+                f"   - Submitted {submission_time}\n"
+                f"   - _Status_: {pr_status}\n"
+            )
+        if reviewed_prs:
+            message_text += "\n"
+            
+    if reviewed_prs:
+        message_text += ":white_check_mark: *Recently Reviewed PRs*\n"
+        message_text += "Please check if they've been merged and remove them to keep things tidy. They will be automatically removed after 5 days.\n"
+        for pr in reviewed_prs:
+            submitter_name = get_username(client, pr['submitter_id'])
+            message_text += f"• *<{pr['permalink']}|{pr['name']}>* by {submitter_name}\n"
 
     return message_text
 
 
-def populate_sla(prs, client):
-    now = datetime.now()
+def populate_sla(prs, channel_sla_time):
+    now = datetime(2024, 9, 6, 16, 40)
+    print("Now is",now)
     overdue_pr_heap = []  # Use a list for heap
     near_sla_prs = []
     active_prs = []
+    reviewed_prs = []
     
     for pr in prs:
         pr_id = pr["id"]
         pr_timestamp = datetime.fromisoformat(pr["timestamp"])
         time_elapsed = calculate_working_hours(pr_timestamp, now)
         reviews_needed = pr["reviews_received"] < pr["reviews_needed"]
-
+        SLA_hours = channel_sla_time
         # Check if the PR is overdue (SLA exceeded)
-        if time_elapsed > SLA_hours * convert_seconds and reviews_needed:
-            time_overdue_seconds = time_elapsed - SLA_hours * convert_seconds
+        if time_elapsed > SLA_hours * 3600 and reviews_needed:
+            time_overdue_seconds = time_elapsed - SLA_hours * 3600
             heapq.heappush(overdue_pr_heap, (-time_overdue_seconds, pr_id))
         # Check if the PR is within 1 hour of SLA
-        elif (SLA_hours - 1) * convert_seconds <= time_elapsed <= SLA_hours * convert_seconds and reviews_needed:
-            near_sla_prs.append(pr)
-        # If it's still active but not nearing SLA or overdue
+        elif (SLA_hours - 1) * 3600 <= time_elapsed <= SLA_hours * 3600 and reviews_needed:
+            near_sla_prs.append((pr,time_elapsed))
+        elif not reviews_needed:
+            reviewed_prs.append(pr)
         else:
             active_prs.append(pr)
 
-    return overdue_pr_heap, near_sla_prs, active_prs
+    return overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs
 
 
 def pr_active_callback(ack, body, client, logger):
     ack()
+    print("IN PR ACTIVE CALLBACK")
     channel_id = body['channel_id']
 
     # Fetch PRs for the channel from DynamoDB
@@ -87,11 +114,12 @@ def pr_active_callback(ack, body, client, logger):
         )
         return
 
+    channel_sla_time = get_channel_sla_time(channel_id)
     # Populate the SLA data for this channel
-    overdue_pr_heap, near_sla_prs, active_prs = populate_sla(prs, client)
+    overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs = populate_sla(prs, channel_sla_time)
 
     # Generate the message text
-    message_text = populate_message_text(channel_id, overdue_pr_heap, near_sla_prs, active_prs, client)
+    message_text = populate_message_text(channel_sla_time,overdue_pr_heap, near_sla_prs, active_prs, reviewed_prs, client)
 
     # Send the message to the channel
     if message_text:
