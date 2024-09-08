@@ -6,6 +6,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from listeners import register_listeners
 from database import setup_dynamodb
 from database_settings import setup_dynamodb_settings
+
 load_dotenv()
 
 logging.basicConfig(level=logging.WARNING)
