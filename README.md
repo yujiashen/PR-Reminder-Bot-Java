@@ -6,7 +6,7 @@ A Slack bot designed to streamline the PR review process by tracking review stat
 
 - **Submit PRs for Review**: Easily submit PRs for review via Slack using the `/pr-submit` command.
 - **Track Review Statuses**: Automatically update and track the status of PRs (needs review, attention requested, reviewed, overdue).
-- **SLA Reminders**: Set configurable SLAs (default: 8 hours) to ensure timely reviews. If a PR exceeds the SLA, the bot sends reminders to the reviewers.
+- **SLA Reminders**: Set configurable SLAs (default: 8 hours) to ensure timely reviews. If a PR is close to or exceeds the SLA, the bot sends reminders to the channel.
 - **Notify Reviewers**: Ping reviewers when their attention is needed or after a PR update.
 - **Notify PR Author**: Ping PR author when their attention is needed.
 - **App Home Integration**: View a list of your active PRs in the Slack app home.
