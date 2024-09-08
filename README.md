@@ -1,19 +1,14 @@
 # PR Reminder Bot
 
-A Slack bot designed to streamline the PR review process by tracking review statuses, sending reminders, and notifying users when their attention is needed.
+A Slack bot to manage and automate PR review processes by tracking statuses, monitoring SLA times, sending reminders for overdue PRs, and notifying users when attention is needed
 
-## Features
+## Key Features
 
-- **Submit PRs for Review**: Easily submit PRs for review via Slack using the `/pr-submit` command.
-- **Track Review Statuses**: Automatically update and track the status of PRs (needs review, attention requested, reviewed, overdue).
-- **SLA Reminders**: Set configurable SLAs (default: 8 hours) to ensure timely reviews. If a PR is close to or exceeds the SLA, the bot sends reminders to the channel.
-- **Notify Reviewers**: Ping reviewers when their attention is needed or after a PR update.
-- **Notify PR Author**: Ping PR author when their attention is needed.
-- **App Home Integration**: View a list of your active PRs in the Slack app home.
-- **Channel Slash Commands**:
-  - `/pr-submit`: Submit a PR for review.
-  - `/pr-active`: View all active PRs in the current channel.
-  - `/pr-settings`: Configure SLA settings for the current channel.
+- **Submit PRs** to manage and track them in the channel.
+- **Track SLA** with reminders for approaching or overdue PRs.
+- **Update statuses** with +1 or comment notification buttons.
+- **Notify PR authors and reviewers** with status updates.
+- **View active PRs** and their current statuses.
 
 ## Installation
 
