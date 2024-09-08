@@ -1,6 +1,4 @@
-import os
 import boto3
-from boto3.dynamodb.conditions import Attr
 from decimal import Decimal
 from botocore.exceptions import ClientError
 import logging

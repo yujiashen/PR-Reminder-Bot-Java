@@ -1,4 +1,3 @@
-.env
 # general things to ignore
 build/
 dist/
@@ -13,6 +12,7 @@ __pycache__/
 *~
 
 # virtualenv
+.env
 env*/
 venv/
 .venv*
@@ -37,3 +37,4 @@ tmp.txt
 logs/
 *.db
 .pytype/
+generate_data.py

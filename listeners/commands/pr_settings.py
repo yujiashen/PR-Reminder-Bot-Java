@@ -57,7 +57,7 @@ def pr_settings_callback(ack, body, client, logger):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "Configure SLA Check Hours PST (click to enable/disable):"
+                    "text": "*Configure SLA Check Hours PST (click to enable/disable)*"
                 }
             }
         ]

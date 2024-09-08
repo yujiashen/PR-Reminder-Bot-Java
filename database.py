@@ -1,8 +1,6 @@
 import os
 from slack_sdk import WebClient
 import boto3
-from datetime import datetime, timedelta
-import random
 from botocore.exceptions import ClientError
 import logging
 logger = logging.getLogger(__name__)
@@ -104,51 +102,3 @@ def delete_all_prs():
                 Key={'id': item['id']}
             )
     logger.info(f"Deleted {len(items)} items from the PRs table.")
-
-def simulate_sla_check():
-    """Simulate SLA check by modifying timestamps of PRs in channel C07K93JGDRA and updating the database."""
-    # Set 'now' to September 6th, 4:40 PM
-    now = datetime(2024, 9, 6, 16, 40)
-    
-    # Variables for setting SLA time conditions
-    overdue_hours = 5
-    nearing_sla_hours = 2.5
-    active_hours = 0
-    
-    # Get all PRs from the store
-    prs = get_prs_from_store()
-
-    # Channel ID to modify PRs for
-    target_channel_id = 'C07K93JGDRA'
-    
-    # Filter PRs for the target channel
-    pr_list = [pr for pr in prs if pr['channel_id'] == target_channel_id]
-
-    # Helper function to slightly randomize the timedelta
-    def randomize_timedelta(hours):
-        """Add a small random delta to avoid exact timestamps."""
-        random_minutes = random.randint(-10, 10)  # Randomize by up to 10 minutes
-        return timedelta(hours=hours, minutes=random_minutes)
-
-    # Ensure there are at least 4 PRs in the target channel
-    if len(pr_list) >= 4:
-        # Make 2 PRs overdue
-        pr_list[0]['timestamp'] = datetime(2024, 9, 5, 16, 44).isoformat()
-        pr_list[1]['timestamp'] = datetime(2024, 9, 6, 8, 20).isoformat()
-        
-        # Make 1 PR nearing SLA
-        pr_list[2]['timestamp'] = datetime(2024, 9, 5, 10, 8).isoformat()
-        
-        # Make 1 PR active
-        pr_list[3]['timestamp'] = datetime(2024, 9, 5, 12, 19).isoformat()
-
-        # Save updated PRs back to the store
-        for pr in pr_list:
-            add_pr_to_store(pr)
-    
-    # Handle other PRs outside of the target channel if necessary
-    for pr in prs:
-        if pr['channel_id'] != target_channel_id:
-            # Keep them active or modify based on your needs
-            pr['timestamp'] = (now - randomize_timedelta(active_hours)).isoformat()
-            add_pr_to_store(pr)
