@@ -5,15 +5,15 @@ A Slack bot designed to streamline the PR review process by tracking review stat
 ## Features
 
 - **Submit PRs for Review**: Easily submit PRs for review via Slack using the `/pr-submit` command.
-- **Track Review Statuses**: Automatically update and track the status of PRs (needs review, in progress, completed).
+- **Track Review Statuses**: Automatically update and track the status of PRs (needs review, attention requested, reviewed, overdue).
 - **SLA Reminders**: Set configurable SLAs (default: 8 hours) to ensure timely reviews. If a PR exceeds the SLA, the bot sends reminders to the reviewers.
-- **Adjust Review Requirements**: Dynamically configure the number of reviews required for a PR to be approved.
 - **Notify Reviewers**: Ping reviewers when their attention is needed or after a PR update.
-- **App Home Integration**: View a list of active PRs in the Slack app home, showing their statuses and a remove option.
+- **Notify PR Author**: Ping PR author when their attention is needed.
+- **App Home Integration**: View a list of your active PRs in the Slack app home.
 - **Channel Slash Commands**:
   - `/pr-submit`: Submit a PR for review.
   - `/pr-active`: View all active PRs in the current channel.
-  - `/pr-settings`: Configure SLA and review settings.
+  - `/pr-settings`: Configure SLA settings for the current channel.
 
 ## Installation
 
@@ -52,9 +52,9 @@ The bot uses a cron job to check SLA times and notify channels periodically. To 
 
 ## Usage
 
-- **PR Submission**: To submit a PR for review, use the `/pr-submit` slash command followed by the PR link.
+- **PR Submission**: To submit a PR for review, use the `/pr-submit` and enter the details
 - **Active PRs**: Use `/pr-active` to see the current status of all active PRs in the channel.
-- **Settings**: Use `/pr-settings` to adjust SLA settings or change the number of reviews required for approval.
+- **Settings**: Use `/pr-settings` to adjust SLA time and notification frequency by channel (default is 8 hours and every hour from 9 to 4 PST)
 
 ## Commands
 
@@ -62,7 +62,7 @@ The bot uses a cron job to check SLA times and notify channels periodically. To 
 | ------------- | ------------------------------------------------ |
 | `/pr-submit`  | Submit a PR for review                           |
 | `/pr-active`  | View all active PRs in the current channel        |
-| `/pr-settings`| Configure SLA and review requirements            |
+| `/pr-settings`| Configure SLA settings            |
 
 ## Development Note
 
